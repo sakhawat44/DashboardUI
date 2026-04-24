@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Finova – Financial Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #080b1a;
+    --surface:   #0e1228;
+    --surface2:  #111530;
+    --border:    rgba(255,255,255,0.07);
+    --purple:    #7c3aed;
+    --purple-lt: #a855f7;
+    --pink:      #db2777;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --muted:     #6b7280;
+    --text:      #f1f5f9;
+    --text-dim:  #94a3b8;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── LAYOUT ── */
+  .shell   { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 220px; min-width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 22px 14px; gap: 6px; overflow-y: auto; }
+  .body    { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar  { display: flex; align-items: center; gap: 14px; padding: 14px 22px; border-bottom: 1px solid var(--border); background: rgba(8,11,26,.85); backdrop-filter: blur(14px); flex-shrink: 0; }
+  .content { flex: 1; overflow-y: auto; padding: 22px; display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-content: start; }
+  .left-col  { display: flex; flex-direction: column; gap: 18px; }
+  .right-col { display: flex; flex-direction: column; gap: 18px; }
+
+  /* ── CARDS ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; }
+  .card-dark { background: var(--surface2); }
+
+  /* ── SIDEBAR ── */
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; padding: 0 6px; }
+  .logo-icon { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, var(--purple), var(--pink)); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 900; flex-shrink: 0; }
+  .logo-text { font-size: 19px; font-weight: 700; letter-spacing: -.5px; }
+
+  .nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 12px; cursor: pointer; color: var(--text-dim); font-size: 13.5px; font-weight: 500; transition: all .18s; }
+  .nav-item:hover { background: rgba(255,255,255,.05); color: var(--text); }
+  .nav-item.active { background: linear-gradient(90deg, var(--purple), var(--purple-lt)); color: #fff; font-weight: 600; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  .sidebar-divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+  .net-worth { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-top: 4px; }
+  .nw-label  { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .nw-val    { font-size: 18px; font-weight: 700; }
+  .nw-change { font-size: 11px; color: var(--green); margin-top: 2px; }
+
+  .mini-card { background: linear-gradient(135deg, #1c1552, #2d1f6e); border: 1px solid rgba(124,58,237,.2); border-radius: 14px; padding: 14px; margin-top: 8px; }
+  .mini-card-label { font-size: 11px; color: #c4b5fd; margin-bottom: 2px; }
+  .mini-card-sub   { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
+  .chip { background: #0a0d1e; border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #c4b5fd; font-family: 'DM Mono', monospace; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chip-visa { font-weight: 700; color: #fff; font-size: 13px; }
+  .btn-view { width: 100%; padding: 8px; border-radius: 10px; border: none; background: linear-gradient(90deg, var(--purple), var(--purple-lt)); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+  .user-row { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px; cursor: pointer; margin-top: 4px; }
+  .user-row:hover { background: rgba(255,255,255,.04); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-sub  { font-size: 11px; color: var(--text-dim); }
+
+  /* ── TOPBAR ── */
+  .search-box { flex: 1; max-width: 400px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.06); border: 1px solid var(--border); border-radius: 11px; padding: 9px 14px; }
+  .search-box input { background: none; border: none; outline: none; color: var(--text); font-size: 13px; font-family: inherit; flex: 1; }
+  .search-box input::placeholder { color: var(--muted); }
+  .kbd { font-size: 10px; color: var(--muted); background: rgba(255,255,255,.06); padding: 2px 7px; border-radius: 5px; font-family: 'DM Mono', monospace; }
+  .tb-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; position: relative; transition: background .18s; }
+  .tb-icon:hover { background: rgba(255,255,255,.1); }
+  .badge { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .tb-user { display: flex; align-items: center; gap: 10px; margin-left: auto; cursor: pointer; }
+  .tb-user-info .name { font-size: 13px; font-weight: 600; }
+  .tb-user-info .role { font-size: 11px; color: var(--text-dim); }
+
+  /* ── BALANCE CHART CARD ── */
+  .balance-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+  .balance-title { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .balance-amt   { font-size: 30px; font-weight: 700; letter-spacing: -1px; }
+  .balance-change { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .up   { color: var(--green); font-size: 13px; font-weight: 600; }
+  .muted-sm { color: var(--text-dim); font-size: 12px; }
+
+  .range-tabs { display: flex; gap: 6px; }
+  .range-tab { padding: 6px 11px; border-radius: 8px; border: none; background: rgba(255,255,255,.06); color: var(--text-dim); font-size: 12px; cursor: pointer; font-family: inherit; transition: all .18s; }
+  .range-tab.active { background: var(--purple); color: #fff; font-weight: 600; }
+  .range-tab:hover:not(.active) { background: rgba(255,255,255,.1); }
+
+  .chart-wrap { position: relative; height: 180px; margin: 16px 0 12px; }
+  .chart-tooltip-bubble { position: absolute; background: #1a1f3e; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 8px 13px; font-size: 12px; pointer-events: none; display: none; }
+  .chart-tooltip-bubble .t-date { color: var(--text-dim); font-size: 11px; }
+  .chart-tooltip-bubble .t-val  { font-weight: 700; font-size: 14px; margin-top: 2px; }
+
+  .legend { display: flex; align-items: center; gap: 20px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+  .dot { width: 10px; height: 10px; border-radius: 3px; }
+  .avg-flow { font-size: 13px; color: var(--text-dim); }
+  .avg-flow strong { color: var(--text); }
+
+  /* ── BOTTOM ROW ── */
+  .bottom-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px; }
+
+  /* promo */
+  .promo-card { background: linear-gradient(145deg, #170f3a 0%, #2a1760 55%, #4c1d95 100%); border: 1px solid rgba(124,58,237,.25); border-radius: 18px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; min-height: 230px; }
+  .promo-glow { position: absolute; right: -30px; top: -30px; width: 180px; height: 180px; background: radial-gradient(circle, rgba(168,85,247,.25) 0%, transparent 70%); pointer-events: none; }
+  .promo-title { font-size: 20px; font-weight: 700; line-height: 1.3; }
+  .promo-title span { color: #f472b6; }
+  .promo-sub { font-size: 12px; color: #c4b5fd; line-height: 1.6; margin-top: 8px; }
+  .promo-avatars { display: flex; margin-top: 14px; }
+  .promo-avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #170f3a; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-left: -7px; background: linear-gradient(135deg, #f59e0b, #ef4444); }
+  .promo-avatar:first-child { margin-left: 0; }
+  .promo-avatar.plus { background: var(--purple); font-size: 11px; font-weight: 700; color: #fff; }
+  .btn-promo { margin-top: 16px; padding: 12px; border-radius: 12px; border: none; background: #fff; color: #170f3a; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+  /* invest bars */
+  .invest-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .invest-title  { font-size: 14px; font-weight: 600; }
+  .invest-filters { display: flex; gap: 10px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+  .invest-amt    { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .invest-change { font-size: 13px; color: var(--green); font-weight: 600; }
+  .invest-chart  { height: 140px; margin-top: 12px; }
+
+  /* ── RIGHT PANEL ── */
+  .my-cards { background: linear-gradient(135deg, #b45309 0%, #be185d 50%, #c2410c 100%); border-radius: 18px; padding: 20px; }
+  .mc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .mc-title  { font-size: 15px; font-weight: 700; }
+  .btn-add   { background: rgba(255,255,255,.2); border: none; color: #fff; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+  .card-row { display: flex; justify-content: space-between; background: rgba(255,255,255,.15); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; font-weight: 500; }
+
+  .visa-card-detail { background: rgba(8,11,26,.8); backdrop-filter: blur(12px); border-radius: 14px; padding: 16px; margin-top: 8px; }
+  .visa-brand { font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 10px; }
+  .visa-num   { font-size: 13px; color: var(--text-dim); margin-bottom: 6px; font-family: 'DM Mono', monospace; }
+  .visa-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .visa-balance-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .visa-balance { font-size: 21px; font-weight: 700; }
+  .visa-up      { font-size: 13px; color: var(--green); font-weight: 600; }
+
+  .action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .btn-req  { padding: 11px; border-radius: 11px; border: none; background: rgba(255,255,255,.15); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn-send { padding: 11px; border-radius: 11px; border: none; background: linear-gradient(90deg, #db2777, #f59e0b); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+  /* transactions */
+  .tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .tx-title   { font-size: 14px; font-weight: 600; }
+  .tx-view    { font-size: 13px; color: var(--purple-lt); cursor: pointer; }
+  .tx-list    { display: flex; flex-direction: column; gap: 14px; }
+  .tx-item    { display: flex; align-items: center; gap: 12px; }
+  .tx-icon    { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .tx-info    { flex: 1; }
+  .tx-name    { font-size: 13px; font-weight: 500; }
+  .tx-date    { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .tx-amt     { font-size: 13px; font-weight: 700; }
+  .tx-pos     { color: var(--green); }
+  .tx-neg     { color: var(--red); }
+
+  /* ── FOOTER ── */
+  footer { padding: 12px 22px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .footer-links { display: flex; gap: 18px; }
+  .footer-links span { cursor: pointer; transition: color .18s; }
+  .footer-links span:hover { color: var(--text); }
+
+  /* ── AMBIENT BLOBS ── */
+  .blob { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(80px); }
+  .blob1 { width: 500px; height: 500px; top: -150px; left: -100px; background: radial-gradient(circle, rgba(124,58,237,.18) 0%, transparent 70%); }
+  .blob2 { width: 400px; height: 400px; bottom: -100px; right: 300px; background: radial-gradient(circle, rgba(219,39,119,.14) 0%, transparent 70%); }
+  .blob3 { width: 300px; height: 300px; top: 40%; right: -50px; background: radial-gradient(circle, rgba(124,58,237,.1) 0%, transparent 70%); }
+
+  /* animations */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .card, .promo-card, .my-cards, .balance-card { animation: fadeUp .45s ease both; }
+  .card:nth-child(2) { animation-delay: .08s; }
+  .card:nth-child(3) { animation-delay: .16s; }
+
+  canvas { display: block; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="blob blob3"></div>
+
+<div class="shell">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">F</div>
+      <span class="logo-text">Finova</span>
+    </div>
+
+    <nav>
+      <div class="nav-item active"><span class="nav-icon">⊞</span> Overview</div>
+      <div class="nav-item"><span class="nav-icon">◎</span> Accounts</div>
+      <div class="nav-item"><span class="nav-icon">⇄</span> Transfers</div>
+      <div class="nav-item"><span class="nav-icon">▭</span> Cards</div>
+      <div class="nav-item"><span class="nav-icon">↗</span> Investments</div>
+      <div class="nav-item"><span class="nav-icon">◈</span> Loans</div>
+      <div class="nav-item"><span class="nav-icon">◉</span> Budgets</div>
+      <div class="nav-item"><span class="nav-icon">⊟</span> Reports</div>
+      <div class="nav-item"><span class="nav-icon">⚙</span> Settings</div>
+    </nav>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="net-worth">
+      <div class="nw-label">Net Worth</div>
+      <div class="nw-val">$198,560.40</div>
+      <div class="nw-change">▲ 12.4% this month</div>
+      <div style="height:36px;margin-top:10px;">
+        <canvas id="miniChart"></canvas>
+      </div>
+    </div>
+
+    <div class="mini-card">
+      <div class="mini-card-label">Finova Credit Card</div>
+      <div class="mini-card-sub">Earn rewards, every time</div>
+      <div class="chip">
+        <span>•••• 5678</span>
+        <span class="chip-visa">VISA</span>
+      </div>
+      <button class="btn-view">View Card</button>
+    </div>
+
+    <div class="user-row">
+      <div class="avatar">👤</div>
+      <div>
+        <div class="user-name">Alex Morgan</div>
+        <div class="user-sub">View Profile</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ BODY ══ -->
+  <div class="body">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="search-box">
+        <span style="color:var(--muted);font-size:15px;">🔍</span>
+        <input type="text" placeholder="Search anything..."/>
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="tb-icon" style="margin-left:auto;">↺</div>
+      <div class="tb-icon">
+        🔔
+        <span class="badge">2</span>
+      </div>
+      <div class="tb-icon">🌙</div>
+      <div class="tb-user">
+        <div class="avatar" style="width:38px;height:38px;font-size:18px;">👤</div>
+        <div class="tb-user-info">
+          <div class="name">Alex Morgan</div>
+          <div class="role">Premium Member</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- LEFT COLUMN -->
+      <div class="left-col">
+
+        <!-- BALANCE CHART -->
+        <div class="card balance-card">
+          <div class="balance-header">
+            <div>
+              <div class="balance-title">Total Balance</div>
+              <div class="balance-amt">$14,560.75</div>
+              <div class="balance-change">
+                <span class="up">▲ 3.48%</span>
+                <span class="muted-sm">vs last month</span>
+              </div>
+            </div>
+            <div class="range-tabs">
+              <button class="range-tab" onclick="setRange(this,'1Y')">1 Year</button>
+              <button class="range-tab active" onclick="setRange(this,'6M')">6 Month</button>
+              <button class="range-tab" onclick="setRange(this,'3M')">3 Month</button>
+              <button class="range-tab" onclick="setRange(this,'1M')">1 Month</button>
+            </div>
+          </div>
+
+          <div class="chart-wrap">
+            <canvas id="balanceChart"></canvas>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div class="avg-flow">Average monthly inflow <strong>$4,320.00</strong></div>
+            <div class="legend">
+              <div class="legend-item"><span class="dot" style="background:var(--purple-lt);"></span> Actual balance</div>
+              <div class="legend-item"><span class="dot" style="background:var(--green);"></span> Planned balance</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM ROW -->
+        <div class="bottom-row">
+
+          <!-- PROMO -->
+          <div class="promo-card">
+            <div class="promo-glow"></div>
+            <div>
+              <div class="promo-title">Your Financial<br><span>Future Starts Here</span></div>
+              <div class="promo-sub">Smart tools, better insights,<br>stronger tomorrow.</div>
+              <div class="promo-avatars">
+                <div class="promo-avatar">🧑</div>
+                <div class="promo-avatar">👩</div>
+                <div class="promo-avatar">👨</div>
+                <div class="promo-avatar plus">+</div>
+              </div>
+            </div>
+            <button class="btn-promo">Get Started</button>
+          </div>
+
+          <!-- INVESTMENTS -->
+          <div class="card card-dark">
+            <div class="invest-header">
+              <div class="invest-title">Investments</div>
+              <div class="invest-filters">
+                <span>Sort 11</span>
+                <span>This Month ▾</span>
+              </div>
+            </div>
+            <div>
+              <span class="invest-amt">$7,890.30</span>
+              <span class="invest-change"> ▲ 5.62%</span>
+            </div>
+            <div class="invest-chart">
+              <canvas id="investChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="right-col">
+
+        <!-- MY CARDS -->
+        <div class="my-cards">
+          <div class="mc-header">
+            <span class="mc-title">My Cards</span>
+            <button class="btn-add">+ Add Card</button>
+          </div>
+          <div class="card-row"><span>Mastercard</span><span>$2,360.00</span></div>
+          <div class="card-row"><span>RuPay</span><span>$1,260.00</span></div>
+          <div class="visa-card-detail">
+            <div class="visa-brand">VISA</div>
+            <div class="visa-num">•••• •••• •••• 9012</div>
+            <div class="visa-label">Available Balance</div>
+            <div class="visa-balance-row">
+              <span class="visa-balance">$2,150.50</span>
+              <span class="visa-up">▲ 4.12%</span>
+            </div>
+          </div>
+          <div class="action-btns">
+            <button class="btn-req">↙ Request</button>
+            <button class="btn-send">↗ Send Money</button>
+          </div>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div class="card" style="flex:1;">
+          <div class="tx-header">
+            <span class="tx-title">Recent Transactions</span>
+            <span class="tx-view">View All</span>
+          </div>
+          <div class="tx-list">
+            <div class="tx-item">
+              <div class="tx-icon">💼</div>
+              <div class="tx-info">
+                <div class="tx-name">Salary from ACME Inc.</div>
+                <div class="tx-date">24 Jan, 10:30 AM</div>
+              </div>
+              <span class="tx-amt tx-pos">+$2,450.00</span>
+            </div>
+            <div class="tx-item">
+              <div class="tx-icon">🎵</div>
+              <div class="tx-info">
+                <div class="tx-name">Spotify Subscription</div>
+                <div class="tx-date">23 Jan, 08:15 PM</div>
+              </div>
+              <span class="tx-amt tx-neg">-$9.99</span>
+            </div>
+            <div class="tx-item">
+              <div class="tx-icon">📦</div>
+              <div class="tx-info">
+                <div class="tx-name">Amazon Purchase</div>
+                <div class="tx-date">22 Jan, 04:20 PM</div>
+              </div>
+              <span class="tx-amt tx-neg">-$124.50</span>
+            </div>
+            <div class="tx-item">
+              <div class="tx-icon">⚡</div>
+              <div class="tx-info">
+                <div class="tx-name">Electricity Bill</div>
+                <div class="tx-date">21 Jan, 11:05 AM</div>
+              </div>
+              <span class="tx-amt tx-neg">-$68.40</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /content -->
+
+    <footer>
+      <span>© 2024 Finova. All rights reserved.</span>
+      <div class="footer-links">
+        <span>Help</span><span>Terms</span><span>Privacy</span><span>Security</span>
+      </div>
+      <span>🌐 English ▾</span>
+    </footer>
+
+  </div><!-- /body -->
+</div><!-- /shell -->
+
+<script>
+// ── CHART DEFAULTS ──
+Chart.defaults.color = '#6b7280';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+const PURPLE = '#a855f7';
+const GREEN  = '#22c55e';
+const DARK   = 'rgba(0,0,0,0)';
+
+// ── MINI SIDEBAR CHART ──
+(function() {
+  const ctx = document.getElementById('miniChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,36);
+  grad.addColorStop(0, 'rgba(168,85,247,.4)');
+  grad.addColorStop(1, 'rgba(168,85,247,0)');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['','','','','',''],
+      datasets: [{ data:[8,9.5,8.8,13.2,12,14.5], borderColor: PURPLE, borderWidth:1.5, fill:true, backgroundColor:grad, tension:.4, pointRadius:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{enabled:false}}, scales:{x:{display:false},y:{display:false}} }
+  });
+})();
+
+// ── BALANCE AREA CHART ──
+const balanceLabels = ['Aug','Sep','Oct','Nov','Dec','Jan'];
+const actualData    = [8000, 9500, 8800, 13250, 12000, 14560];
+const plannedData   = [9000,10000,10500, 11000, 13000, 14000];
+
+const balCtx = document.getElementById('balanceChart').getContext('2d');
+const gActual = balCtx.createLinearGradient(0,0,0,180);
+gActual.addColorStop(0,'rgba(168,85,247,.45)');
+gActual.addColorStop(1,'rgba(168,85,247,0.02)');
+const gPlanned = balCtx.createLinearGradient(0,0,0,180);
+gPlanned.addColorStop(0,'rgba(34,197,94,.25)');
+gPlanned.addColorStop(1,'rgba(34,197,94,0.02)');
+
+const balChart = new Chart(balCtx, {
+  type: 'line',
+  data: {
+    labels: balanceLabels,
+    datasets: [
+      {
+        label:'Actual',
+        data: actualData,
+        borderColor: PURPLE,
+        borderWidth: 2.5,
+        fill: true,
+        backgroundColor: gActual,
+        tension: .45,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: PURPLE,
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
+      },
+      {
+        label:'Planned',
+        data: plannedData,
+        borderColor: GREEN,
+        borderWidth: 1.5,
+        borderDash: [5,4],
+        fill: true,
+        backgroundColor: gPlanned,
+        tension: .45,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: GREEN,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { display:false },
+      tooltip: {
+        backgroundColor: '#1a1f3e',
+        borderColor: 'rgba(255,255,255,.1)',
+        borderWidth: 1,
+        titleColor: '#94a3b8',
+        bodyColor: '#f1f5f9',
+        padding: 12,
+        cornerRadius: 10,
+        callbacks: {
+          label: ctx => ` $${ctx.parsed.y.toLocaleString()}`
+        }
+      }
+    },
+    scales: {
+      x: { grid:{ color:'rgba(255,255,255,.04)', drawTicks:false }, ticks:{ padding:8 }, border:{ display:false } },
+      y: {
+        grid:{ color:'rgba(255,255,255,.04)', drawTicks:false },
+        ticks:{ padding:8, callback: v => `$${(v/1000).toFixed(0)}k` },
+        border:{ display:false }
+      }
+    }
+  }
+});
+
+// ── RANGE TOGGLE ──
+const rangeDatasets = {
+  '1Y': { actual:[6000,7200,8000,9500,8800,13250,12000,14560,13000,15200,14800,14560], planned:[7000,8000,9000,10000,10500,11000,13000,14000,13500,15000,14500,14000], labels:['Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'] },
+  '6M': { actual:actualData, planned:plannedData, labels:balanceLabels },
+  '3M': { actual:[8800,13250,12000,14560], planned:[10500,11000,13000,14000], labels:['Oct','Nov','Dec','Jan'] },
+  '1M': { actual:[12500,13000,13800,14560], planned:[13000,13500,14000,14000], labels:['Week1','Week2','Week3','Week4'] },
+};
+
+function setRange(btn, key) {
+  document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const d = rangeDatasets[key];
+  balChart.data.labels = d.labels;
+  balChart.data.datasets[0].data = d.actual;
+  balChart.data.datasets[1].data = d.planned;
+  balChart.update('active');
+}
+
+// ── INVESTMENTS BAR CHART ──
+(function() {
+  const ctx = document.getElementById('investChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,140);
+  grad.addColorStop(0, '#22c55e');
+  grad.addColorStop(1, '#7c3aed');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Aug','Sep','Oct','Nov','Dec','Jan'],
+      datasets: [{
+        data: [1200,1800,2600,3100,4700,2900],
+        backgroundColor: (ctx) => {
+          const i = ctx.dataIndex;
+          const g2 = ctx.chart.ctx.createLinearGradient(0,0,0,140);
+          g2.addColorStop(0, i===4 ? '#22c55e' : '#a855f7');
+          g2.addColorStop(1, '#7c3aed');
+          return g2;
+        },
+        borderRadius: 7,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          backgroundColor:'#1a1f3e',
+          borderColor:'rgba(255,255,255,.1)',
+          borderWidth:1,
+          padding:10,
+          cornerRadius:10,
+          callbacks: { label: ctx => ` $${ctx.parsed.y.toLocaleString()}` }
+        }
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{padding:4}, border:{display:false} },
+        y: { display:false }
+      }
+    }
+  });
+})();
+
+// ── NAV INTERACTIONS ──
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
